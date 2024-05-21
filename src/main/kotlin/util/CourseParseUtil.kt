@@ -1,8 +1,8 @@
-package util
+package org.jetos.util
 
 import com.alibaba.fastjson2.JSON
 import com.alibaba.fastjson2.TypeReference
-import data.*
+import org.jetos.data.*
 import org.jsoup.Jsoup
 import org.mozilla.javascript.Context
 import org.mozilla.javascript.Scriptable
@@ -122,6 +122,9 @@ class TeacherCourseParser(
         val rows = table.select("tbody > tr")
         rows.drop(1).forEach { element ->
             val tds = element.select("td")
+            if (tds.size<8){
+                return@forEach
+            }
             val courseId = tds[1].text()
             val courseCode = tds[2].text()
             val courseName = tds[3].text().replace("(", "（").replace(")", "）")

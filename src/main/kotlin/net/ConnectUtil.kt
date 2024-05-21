@@ -1,16 +1,16 @@
-package net
+package org.jetos.net
 
 import com.alibaba.fastjson2.JSON
-import data.Course
-import data.Teacher
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
 import okhttp3.*
+import org.jetos.data.Course
+import org.jetos.data.Teacher
+import org.jetos.util.StudentCourseParser
+import org.jetos.util.TeacherCourseParser
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import util.StudentCourseParser
-import util.TeacherCourseParser
 import java.io.File
 import java.util.*
 import java.util.logging.Logger
@@ -26,9 +26,9 @@ private data class SerializableCookie(
 ) {
     fun toCookie(): Cookie {
         return Cookie.Builder().name(name).value(value).expiresAt(expiresAt).domain(domain).path(path).apply {
-                if (secure) secure()
-                if (httpOnly) httpOnly()
-            }.build()
+            if (secure) secure()
+            if (httpOnly) httpOnly()
+        }.build()
     }
 
     companion object {
@@ -109,6 +109,7 @@ class RequestQueueManager(
     )
 ) {
     private val logger: Logger = Logger.getLogger("RequestQueueManager")
+
     /**
      * @param cookieFile 保存cookie的文件
      * @param period 请求间隔
@@ -124,12 +125,12 @@ class RequestQueueManager(
         var beforeRetry: suspend () -> Unit = {}
     )
 
-    class QueueResponse(val response: Response){
-        val responseText: String by lazy {
+    class QueueResponse(val response: Response) {
+        val responseText: String =
             response.use {
                 it.body!!.string()
             }
-        }
+
         val isSuccessful: Boolean = response.isSuccessful
 
         val url: HttpUrl = response.request.url
@@ -141,8 +142,9 @@ class RequestQueueManager(
     class RetryException(override val message: String?) : CancellationException()
 
     data class QueueRequest(val request: Request, var retryRemains: Int = -1, val priority: Int = 0)
-    
-    data class QueueItem(val request: QueueRequest, val response: CompletableDeferred<QueueResponse>):Comparable<QueueItem> {
+
+    data class QueueItem(val request: QueueRequest, val response: CompletableDeferred<QueueResponse>) :
+        Comparable<QueueItem> {
         override fun compareTo(other: QueueItem): Int {
             return other.request.priority - this.request.priority
         }
@@ -181,9 +183,9 @@ class RequestQueueManager(
                         val response = client.newCall(request).execute()
                         val queueResponse = QueueResponse(response)
                         if (config.retryWhen(queueResponse) && remainRetry != -1) {
-                            if (remainRetry <= 0)  {
+                            if (remainRetry <= 0) {
                                 responseDeferred.completeExceptionally(RetryException("$request retry failed, no retry times remain"))
-                            }else{
+                            } else {
                                 logger.info("Retry required, append to end of queue, remain retry times: $remainRetry")
                                 queueRequest.retryRemains -= 1
                                 CoroutineScope(Dispatchers.IO).launch {
@@ -207,7 +209,12 @@ class RequestQueueManager(
     fun enqueueRequest(request: Request, doNotRetry: Boolean = false): Deferred<QueueResponse> {
         val responseDeferred = CompletableDeferred<QueueResponse>()
         CoroutineScope(Dispatchers.IO).launch {
-            requestChannel.send(QueueItem(QueueRequest(request,if (doNotRetry) -1 else config.retryTimes), responseDeferred))
+            requestChannel.send(
+                QueueItem(
+                    QueueRequest(request, if (doNotRetry) -1 else config.retryTimes),
+                    responseDeferred
+                )
+            )
         }
         return responseDeferred
     }
@@ -218,6 +225,42 @@ class RequestQueueManager(
     }
 }
 
+/**
+ * 用于连接系统进行数据访问，包含如下几个方法：
+ *
+ * [ConnectUtil.getIds]获取登录用户id（仅学生）
+ *
+ * [ConnectUtil.getHome]模拟访问系统主页面（主要用于检测登录或登录）
+ *
+ * [ConnectUtil.getCourse]获取登录用户的所有课程
+ *
+ * [ConnectUtil.getCourseByTeacher]获取教师的所有课程
+ *
+ * [ConnectUtil.getAllTeacherList]获取所有的教师列表
+ *
+ * [ConnectUtil.getCourseByStudent]The Last Choice
+ * Kotlin请参考如下代码：
+ * ```
+ * runBlocking {
+ *
+ *     if (ConnectUtil.username == null || ConnectUtil.password == null) {
+ *
+ *         throw IllegalStateException("Please input your username and password")
+ *     }
+ *     ConnectUtil.getAllTeacherList()
+ *     ConnectUtil.getIds()
+ *     ConnectUtil.getCourse()
+ *     ConnectUtil.getCourseByTeacher(Teacher(teacherId = 12099))?.let { courses ->
+ *         for (course in courses) {
+ *             println(course.coursePeriods.map { it.getWeeks() to it.getDayTime() to it.getDayTimeStr() }
+ *                 .sortedBy { it.first.second.second }.sortedBy { it.first.second.first }
+ *                 .map { it.first.first to it.second })
+ *         }
+ *     }
+ *     Unit
+ * }
+ *```
+ */
 object ConnectUtil {
     private const val HOME_URL = "http://219.216.96.4/eams/homeExt.action"
     private const val COURSE_URL = "http://219.216.96.4/eams/courseTableForStd!courseTable.action"
@@ -240,7 +283,7 @@ object ConnectUtil {
                 if (response.url.toString().contains("login")) {
                     logger.info("Login required: System will login and retry")
                     true
-                }else false
+                } else false
             }
 
             _requestQueueManager = RequestQueueManager.getInstance(value)
@@ -260,7 +303,7 @@ object ConnectUtil {
      * 请求主页，获取登录地址，构造登录表单，登录
      * 会自动判断是否需要登录
      */
-    suspend fun getHome() {
+    internal suspend fun getHome() {
         assert(username != null)
         assert(password != null)
         val request = _requestQueueManager.enqueueRequest(HOME_URL, true)
@@ -300,13 +343,14 @@ object ConnectUtil {
     /**
      * 获取当前用户ids
      * */
-    suspend fun getIds() {
+    internal suspend fun getIds(): String? {
         val request = _requestQueueManager.enqueueRequest(COURSE_HOME_URL + "?_=" + System.currentTimeMillis())
-        this.ids = request.await().let { (_,responseText) ->
+        this.ids = request.await().let { (_, responseText) ->
             val ids = Regex(""""ids","(\d+)"""").find(responseText)!!.groupValues[1]
             logger.info("已经获取到用户ids: $ids")
             ids
         }
+        return this.ids
     }
 
     /**
@@ -318,14 +362,14 @@ object ConnectUtil {
      * @param projectId 1
      * @param semesterId 72
      */
-    suspend fun getCourse(
+    internal suspend fun getCourse(
         ignoreHead: Boolean = true,
         showPrintAndExport: Boolean = true,
         settingKind: String = "std",
         startWeek: String = "",
         projectId: String = "1",
         semesterId: String = "72",
-    ) {
+    ):List<Course>? {
         assert(ids != null)
         //构造请求表单 form-data
         val formBody = FormBody.Builder().add("ignoreHead", ignoreHead.toString())
@@ -335,12 +379,13 @@ object ConnectUtil {
         val request = Request.Builder().url(COURSE_URL).post(formBody).addHeader("Referer", COURSE_HOME_URL).build()
         val response = _requestQueueManager.enqueueRequest(request)
 
-        response.await().let { (courseResponse, body) ->
+        return response.await().let { (courseResponse, body) ->
             if (courseResponse.isSuccessful) {
                 logger.info("获取课程表成功")
                 StudentCourseParser(semesterId).parseCourse(body)
             } else {
                 logger.info("获取课程表失败")
+                null
             }
         }
     }
@@ -350,7 +395,7 @@ object ConnectUtil {
      * @param teacher 教师
      * @param semesterId 学期id
      */
-    suspend fun getCourseByTeacher(teacher: Teacher, semesterId: String = "72"):List<Course> {
+    internal suspend fun getCourseByTeacher(teacher: Teacher, semesterId: String = "72"): List<Course>? {
         val url = "$PUBLIC_COURSE_URL?setting.kind=teacher&ids=${teacher.teacherId}&semester.id=$semesterId"
         val response = _requestQueueManager.enqueueRequest(url)
         response.await().let { (courseResponse, body) ->
@@ -359,9 +404,9 @@ object ConnectUtil {
                 return TeacherCourseParser(teacher, semesterId).parseCourse(body)
             } else {
                 logger.info("获取课程表失败")
+                return null
             }
         }
-        return emptyList()
     }
 
     /**
@@ -369,16 +414,17 @@ object ConnectUtil {
      * @param studentId 学生id
      * @param semesterId 学期id
      */
-    suspend fun getCourseByStudent(studentId: Int, semesterId: String = "72") {
+    internal suspend fun getCourseByStudent(studentId: Int, semesterId: String = "72"):List<Course>? {
         val url = "$PUBLIC_COURSE_URL?setting.kind=std&ids=${studentId}&semester.id=$semesterId"
         val response = _requestQueueManager.enqueueRequest(url)
-        response.await().let { courseResponse ->
+        return response.await().let { courseResponse ->
             val body = courseResponse.responseText
             if (courseResponse.isSuccessful) {
                 logger.info("获取学生${studentId}的课程表成功")
                 StudentCourseParser(semesterId).parseCourse(body)
             } else {
                 logger.info("获取学生${studentId}的课程表失败")
+                null
             }
         }
     }
@@ -389,16 +435,16 @@ object ConnectUtil {
      * 原请求格式：semester.id=72&courseTableType=teacher&_=1715861047012&pageNo=1&pageSize=3000 POST
      *
      * */
-    suspend fun getAllTeacherList(semesterId: String = "72"): List<Teacher> {
+    internal suspend fun getAllTeacherList(semesterId: String = "72"): List<Teacher>? {
         val formBody =
             FormBody.Builder().add("courseTableType", "teacher").add("project.id", "1").add("semester.id", semesterId)
                 .add("pageNo", "1").add("pageSize", "3000").add("_", System.currentTimeMillis().toString()).build()
         val request = Request.Builder().url(PUBLIC_QUERY_URL).post(formBody).build()
         val response = _requestQueueManager.enqueueRequest(request)
-        val teachers = mutableListOf<Teacher>()
-        response.await().let{ courseResponse ->
+        response.await().let { courseResponse ->
             if (courseResponse.isSuccessful) {
                 logger.info("获取教师列表成功")
+                val teachers = mutableListOf<Teacher>()
                 courseResponse.responseText.let {
                     logger.info("body: ${it.length}")
                     val doc = Jsoup.parse(it)
@@ -415,25 +461,12 @@ object ConnectUtil {
                         }
                     }
                 }
+                return teachers
+
             } else {
                 logger.info("获取教师列表失败")
+                return null
             }
-        }
-        return teachers
-    }
-}
-
-fun main() = runBlocking {
-
-    if (ConnectUtil.username == null || ConnectUtil.password == null) {
-        throw IllegalStateException("Please input your username and password")
-    }
-    ConnectUtil.getAllTeacherList()
-    ConnectUtil.getIds()
-    ConnectUtil.getCourse()
-    ConnectUtil.getCourseByTeacher(Teacher(teacherId = 12099)).let { courses ->
-        for (course in courses) {
-            println(course.coursePeriods.map { it.getWeeks() to it.getDayTime() to it.getDayTimeStr() }.sortedBy { it.first.second.second }.sortedBy { it.first.second.first }.map { it.first.first to it.second })
         }
     }
 }

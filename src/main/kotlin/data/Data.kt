@@ -1,7 +1,7 @@
-package data
+package org.jetos.data
 
-//整理后如下：
-/*
+/**
+ * 课程表数据类
 {
     "courseId": "103055(A070835)",
     "courseName": "工程伦理学(A070835)",
@@ -13,7 +13,7 @@ package data
     "taskId": null,
     "teacherId": "9863,10341,11272,13741",
     "teacherName": "任涛,李昕,刘益先,曾荣飞",
-    "vaildWeeks": "00100000000000000000000000000000000000000000000000000"
+    "vaildWeeks": "00100000000000000000000000000000000000000000000000000" //注意这里有笔误
 */
 data class MetaCourse(
     val courseId: String,//"103055(A070835)"
