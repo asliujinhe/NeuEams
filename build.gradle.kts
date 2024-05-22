@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "org.jetos"
-version = "1.0.1"
+version = "1.0.3"
 
 
 
@@ -30,7 +30,8 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.mozilla:rhino:1.7.15")
-    implementation("com.alibaba:fastjson:2.0.50")
+    //gson
+    implementation("com.google.code.gson:gson:2.11.0")
     implementation("org.jsoup:jsoup:1.15.3")
 }
 

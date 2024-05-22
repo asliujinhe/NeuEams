@@ -1,6 +1,7 @@
 package org.jetos.net
 
-import com.alibaba.fastjson2.JSON
+
+import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
@@ -48,15 +49,16 @@ private class SimpleCookieJar(private val file: File) : CookieJar {
             entry.value.map { SerializableCookie.fromCookie(it) }
         }
 
-        val json = JSON.toJSONString(allCookies)
+        val json =Gson().toJson(allCookies)
         file.writeText(json)
     }
 
     private fun loadCookie() {
         if (!file.exists()) return
 
-        val json = file.readText()
-        val allCookies = JSON.parseArray(json, SerializableCookie::class.java)
+        val allCookies = Gson().fromJson(file.reader(), Array<SerializableCookie>::class.java)?:run {
+            return
+        }
 
         allCookies.forEach { serializableCookie ->
             val cookie = serializableCookie.toCookie()
@@ -105,7 +107,7 @@ private class SimpleCookieJar(private val file: File) : CookieJar {
 
 class RequestQueueManager(
     val config: Config = Config(
-        cookieFile = File("cookie.json"), period = 1000
+        cookieFile = File(System.getProperty("user.dir") + File.separator + "cookie.json"), period = 1000
     )
 ) {
     private val logger: Logger = Logger.getLogger("RequestQueueManager")
@@ -119,7 +121,7 @@ class RequestQueueManager(
      * */
     data class Config(
         val cookieFile: File,
-        val period: Int,
+        val period: Int = 1000,
         var retryWhen: (QueueResponse) -> Boolean = { false },
         var retryTimes: Int = 3,
         var beforeRetry: suspend () -> Unit = {}
@@ -269,8 +271,8 @@ object ConnectUtil {
     private const val PUBLIC_QUERY_URL = "http://219.216.96.4/eams/studentPublicScheduleQuery!search.action"
     private val logger: Logger = Logger.getLogger("ConnectUtil")
 
-    var username: String? = null
-    var password: String? = null
+    internal var username: String? = null
+    internal var password: String? = null
 
     var config: RequestQueueManager.Config = RequestQueueManager.Config(File("cookie.json"), 1000)
         set(value) {
@@ -302,8 +304,9 @@ object ConnectUtil {
     /**
      * 请求主页，获取登录地址，构造登录表单，登录
      * 会自动判断是否需要登录
+     * @return 登录成功返回姓名，失败返回null
      */
-    internal suspend fun getHome() {
+    internal suspend fun getHome():String? {
         assert(username != null)
         assert(password != null)
         val request = _requestQueueManager.enqueueRequest(HOME_URL, true)
@@ -311,10 +314,10 @@ object ConnectUtil {
         //获取地址
         val body = response.responseText
         val url = response.response.request.url
+        val document: Document = Jsoup.parse(body)
 
         if (url.toString().contains("login")) {
             logger.info("Login required")
-            val document: Document = Jsoup.parse(body)
             var targetUrl = document.select("form").attr("action")
             //resolve url with base url
             targetUrl = url.resolve(targetUrl).toString()
@@ -329,15 +332,20 @@ object ConnectUtil {
                     .add("execution", execution).add("_eventId", eventId).build()
             //构造登录表单
             val loginRequest = Request.Builder().url(targetUrl).post(formBody).build()
-            _requestQueueManager.enqueueRequest(loginRequest, true).await().let { loginResponse ->
+            return _requestQueueManager.enqueueRequest(loginRequest, true).await().let { loginResponse ->
                 val loginUrl = loginResponse.url.toString()
                 if (loginUrl.contains(HOME_URL)) {
                     logger.info("Login success")
+                    val doc = Jsoup.parse(loginResponse.responseText)
+                    val name = doc.select("a[class=personal-name]").text()
+                    name
                 } else {
                     logger.info("Login failed")
+                    null
                 }
             }
         }
+        return document.select("a[class=personal-name]").text()
     }
 
     /**
@@ -370,7 +378,9 @@ object ConnectUtil {
         projectId: String = "1",
         semesterId: String = "72",
     ):List<Course>? {
-        assert(ids != null)
+        if (ids == null){
+            getIds()
+        }
         //构造请求表单 form-data
         val formBody = FormBody.Builder().add("ignoreHead", ignoreHead.toString())
             .add("showPrintAndExport", showPrintAndExport.toString()).add("setting.kind", settingKind)
@@ -468,5 +478,14 @@ object ConnectUtil {
                 return null
             }
         }
+    }
+
+    /**
+     * 登出: 删除cookie文件, 清空用户名和密码.需要重新登录
+     */
+    fun logout() {
+        _requestQueueManager.config.cookieFile.delete()
+        username = null
+        password = null
     }
 }

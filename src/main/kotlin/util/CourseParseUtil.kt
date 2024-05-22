@@ -1,7 +1,6 @@
 package org.jetos.util
 
-import com.alibaba.fastjson2.JSON
-import com.alibaba.fastjson2.TypeReference
+import com.google.gson.Gson
 import org.jetos.data.*
 import org.jsoup.Jsoup
 import org.mozilla.javascript.Context
@@ -33,11 +32,16 @@ private fun CourseParser.parseActivities(scriptString: String): List<List<MetaCo
 
     val result = context.evaluateString(scope, "JSON.stringify(table0.activities)", "script", 1, null)
 
-    val typeRef = object : TypeReference<List<List<MetaCourse>>>() {}
+    //val typeRef = object : TypeReference<List<List<MetaCourse>>>() {}
     /*List<List<MetaCourse>>*/
-    val json = JSON.parseObject(Context.toString(result), typeRef)
+    val json = Context.toString(result)
 
-    return json
+    //for List<List<MetaCourse>>
+    val metas = Gson().fromJson(json, Array<Array<MetaCourse>>::class.java).map {
+        it.toList()
+    }
+
+    return metas
 }
 
 
@@ -92,8 +96,9 @@ class StudentCourseParser(semesterId: String): CourseParser(semesterId){
     override fun parseCourse(document:String): List<Course> {
         val doc = Jsoup.parse(document)
         val script = doc.select("script").filter { it-> it.data().contains("var activity=null;")}[0]
-        parseActivities(script.data())
-        return emptyList()
+        val metas = parseActivities(script.data())
+        val parsedCourses = convertMeta2Course(metas)
+        return parsedCourses
     }
 
 

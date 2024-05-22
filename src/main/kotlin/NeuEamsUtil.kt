@@ -5,20 +5,65 @@ import org.jetos.data.Course
 import org.jetos.data.Teacher
 import org.jetos.net.ConnectUtil
 import org.jetos.net.RequestQueueManager
+import java.io.File
+import java.util.function.Consumer
 
-
+/**
+ * 一个工具类，用于获取东北大学教务系统的课程表信息
+ * @see ConnectUtil
+ * @see RequestQueueManager
+ * @see Course
+ * @see Teacher
+ * @see RequestQueueManager.Config
+ */
 object NeuEamsUtil {
     private val coroutineScope = Dispatchers.IO
     private val handler: CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         println(throwable.message)
     }
+
     /**
-     * （可选）设置配置文件默认使用运行所在目录进行cookie文件的创建
+     * （可选）设置配置文件默认使用运行所在目录进行cookie文件的创建，以此来进行登录或保持登录状态
+     * @param config 配置文件
+     *
+     * 其中：
+     * `cookieFile` cookie文件（默认为工作目录下的`cookie.json`）
+     * `period` 请求间隔
+     *
+     * 对于Kotlin:
+     * ```kotlin
+     * RequestQueueManager.Config(
+     *    cookieFile = File("cookie.txt"),
+     *    period = 1000
+     * )
+     * ```
+     * 对于Java:
+     * ```java
+     * RequestQueueManager.Config config = new RequestQueueManager.Config(
+     *   new File("cookie.txt"),
+     *   1000
+     * );
      * @see RequestQueueManager.Config
      *
      */
-    fun setConfig(config: RequestQueueManager.Config){
+    fun setConfig(config: RequestQueueManager.Config) {
         ConnectUtil.config = config
+    }
+
+    /**
+     * （可选）设置配置文件默认使用运行所在目录进行cookie文件的创建，以此来进行登录或保持登录状态
+     * @see setConfig
+     */
+    fun setConfig(cookieFile: File, period: Int) {
+        ConnectUtil.config = RequestQueueManager.Config(cookieFile, period)
+    }
+
+    /**
+     * 注销
+     * @see ConnectUtil.logout
+     */
+    fun logout() {
+        ConnectUtil.logout()
     }
 
     /**
@@ -33,14 +78,27 @@ object NeuEamsUtil {
     }
 
     /**
+     * 获取当前登录用户的真实姓名
+     * @param callback 代码调用回调
+     * @return 通过回调返回真实姓名，有问题则返回null Formatted as "张三(2021xxxx)"
+     */
+    fun getUserActualName(callback: Consumer<String?>) {
+        CoroutineScope(coroutineScope).launch {
+            launch(handler) {
+                callback.accept(ConnectUtil.getHome())
+            }.join()
+        }
+    }
+
+    /**
      * 学生
      * 获取当前学生的Ids，仅学生端有效（教师端未知）
      * @see ConnectUtil.getIds
      */
-    fun getIds(callback:(String?)->Unit){
+    fun getIds(callback: Consumer<String?>) {
         CoroutineScope(coroutineScope).launch {
             launch(handler) {
-                callback(ConnectUtil.getIds())
+                callback.accept(ConnectUtil.getIds())
             }.join()
         }
     }
@@ -52,10 +110,10 @@ object NeuEamsUtil {
      * @return 课程列表，如果网络或鉴权异常会返回null
      * @throws
      */
-    fun getCourse(semesterId:String, callback: (List<Course>?) -> Unit){
+    fun getCourse(semesterId: String, callback: Consumer<List<Course>?>) {
         CoroutineScope(coroutineScope).launch {
             launch(handler) {
-                callback(ConnectUtil.getCourse(semesterId = semesterId))
+                callback.accept(ConnectUtil.getCourse(semesterId = semesterId))
             }.join()
         }
     }
@@ -68,10 +126,10 @@ object NeuEamsUtil {
      * @see Teacher
      * @see getTeacherCourse
      */
-    fun getTeacherCourse(teacher: Teacher, semesterId: String, callback: (List<Course>?) -> Unit){
+    fun getTeacherCourse(teacher: Teacher, semesterId: String, callback: Consumer<List<Course>?>) {
         CoroutineScope(coroutineScope).launch {
             launch(handler) {
-                callback(ConnectUtil.getCourseByTeacher(teacher, semesterId))
+                callback.accept(ConnectUtil.getCourseByTeacher(teacher, semesterId))
             }.join()
         }
     }
@@ -80,8 +138,8 @@ object NeuEamsUtil {
      * A simplified version for `getTeacherCourse`
      * @see getTeacherCourse
      */
-    fun getTeacherCourse(teacherId: Int, semesterId: String, callback: (List<Course>?) -> Unit){
-        return getTeacherCourse(Teacher(teacherId),semesterId,callback)
+    fun getTeacherCourse(teacherId: Int, semesterId: String, callback: Consumer<List<Course>?>) {
+        return getTeacherCourse(Teacher(teacherId), semesterId, callback)
     }
 
     /**
@@ -92,10 +150,10 @@ object NeuEamsUtil {
      * @return 通过回调返回课程列表，有问题则返回null
      * @see getTeacherCourse
      */
-    fun getStudentCourse(studentId: Int, semesterId: String, callback: (List<Course>?) -> Unit){
+    fun getStudentCourse(studentId: Int, semesterId: String, callback: Consumer<List<Course>?>) {
         CoroutineScope(coroutineScope).launch {
             launch(handler) {
-                callback(ConnectUtil.getCourseByStudent(studentId, semesterId))
+                callback.accept(ConnectUtil.getCourseByStudent(studentId, semesterId))
             }.join()
         }
     }
@@ -106,10 +164,10 @@ object NeuEamsUtil {
      * @param callback 代码调用回调
      * @return 通过回调返回教师列表，有问题则返回null
      */
-    fun getTeacherList(semesterId: String, callback: (List<Teacher>?)->Unit){
+    fun getTeacherList(semesterId: String, callback: Consumer<List<Teacher>?>) {
         CoroutineScope(coroutineScope).launch {
-            launch(handler){
-                callback(ConnectUtil.getAllTeacherList(semesterId))
+            launch(handler) {
+                callback.accept(ConnectUtil.getAllTeacherList(semesterId))
             }
         }
     }
