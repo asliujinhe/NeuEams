@@ -154,6 +154,7 @@ class TeacherCourseParser(
     }
 }
 
+@Suppress("unused")
 fun List<Course>.filterByWeekAndPeriod(week: Int = -1, period: Int = -1):List<Course>{
     return this.filter { course ->
         course.coursePeriods.let { periods ->

@@ -102,6 +102,11 @@ private class SimpleCookieJar(private val file: File) : CookieJar {
         }
         return validCookies
     }
+
+    fun clear() {
+        cookieStore.clear()
+        saveCookie()
+    }
 }
 
 
@@ -190,9 +195,14 @@ class RequestQueueManager(
                             } else {
                                 logger.info("Retry required, append to end of queue, remain retry times: $remainRetry")
                                 queueRequest.retryRemains -= 1
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    config.beforeRetry()
-                                    requestChannel.send(QueueItem(queueRequest, responseDeferred))
+
+                                launch {
+                                    try {
+                                        config.beforeRetry()
+                                        requestChannel.send(QueueItem(queueRequest, responseDeferred))
+                                    } catch (e: Exception) {
+                                        responseDeferred.completeExceptionally(e)
+                                    }
                                 }
                             }
                         } else {
@@ -224,6 +234,9 @@ class RequestQueueManager(
     fun enqueueRequest(url: String, doNotRetry: Boolean = false): Deferred<QueueResponse> {
         val request = Request.Builder().url(url).build()
         return enqueueRequest(request, doNotRetry)
+    }
+    fun clearCookie() {
+        cookieJar.clear()
     }
 }
 
@@ -307,8 +320,9 @@ object ConnectUtil {
      * @return 登录成功返回姓名，失败返回null
      */
     internal suspend fun getHome():String? {
-        assert(username != null)
-        assert(password != null)
+        if (username == null || password == null) {
+            throw IllegalStateException("Please input your username and password")
+        }
         val request = _requestQueueManager.enqueueRequest(HOME_URL, true)
         val response = request.await()
         //获取地址
@@ -483,9 +497,25 @@ object ConnectUtil {
     /**
      * 登出: 删除cookie文件, 清空用户名和密码.需要重新登录
      */
-    fun logout() {
-        _requestQueueManager.config.cookieFile.delete()
+    internal fun logout() {
+        _requestQueueManager.clearCookie()
         username = null
         password = null
+        ids = null
+    }
+
+    /**
+     * 检查网络
+     * @return 是否连接教务系统成功
+     */
+    internal suspend fun checkNetwork(): Boolean {
+        return try {
+            val request = Request.Builder().url(HOME_URL).build()
+            val response = _requestQueueManager.enqueueRequest(request, true).await()
+            //只要返回数据就行，不需要一定成功
+            response.isSuccessful
+        } catch (e: Exception) {
+            false
+        }
     }
 }
