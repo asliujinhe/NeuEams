@@ -1,8 +1,7 @@
 package org.jetos.util
 
 import com.google.gson.Gson
-import org.jetos.assets.TaskActivity_New
-import org.jetos.assets.UnderScore
+import org.jetos.assets.Files
 import org.jetos.data.*
 import org.jsoup.Jsoup
 import org.mozilla.javascript.Context
@@ -19,9 +18,9 @@ abstract class CourseParser(val semesterId: String){
 private fun parseActivities(scriptString: String): List<List<MetaCourse>> {
     val context = Context.enter()
     val scope: Scriptable = context.initStandardObjects()
-    context.evaluateString(scope, TaskActivity_New, "TaskActivity", 1, null)
+    context.evaluateString(scope, Files.TaskActivity_New, "TaskActivity", 1, null)
 
-    context.evaluateString(scope, UnderScore, "underscore", 1, null)
+    context.evaluateString(scope, Files.UnderScore, "underscore", 1, null)
 
     context.evaluateString(scope, scriptString, "script", 1, null)
 
