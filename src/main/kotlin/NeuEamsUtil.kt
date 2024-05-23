@@ -241,3 +241,15 @@ object NeuEamsUtil {
         }
     }
 }
+
+fun main() {
+    NeuEamsUtil.login("20216844",                                                           "1qazwinefefqa52456", Consumer {
+        println(it)
+        NeuEamsUtil.getCourse("72", Consumer {
+        println(it)
+
+    })
+    })
+    while (true){}
+
+}

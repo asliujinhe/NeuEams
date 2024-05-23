@@ -1,7 +1,7 @@
 package org.jetos.util
 
 import com.google.gson.Gson
-import org.jetos.assets.Files
+import org.jetos.ResourceLoader
 import org.jetos.data.*
 import org.jsoup.Jsoup
 import org.mozilla.javascript.Context
@@ -15,12 +15,17 @@ abstract class CourseParser(val semesterId: String){
     abstract fun parseCourse(document: String):List<Course>
 }
 
+
+
 private fun parseActivities(scriptString: String): List<List<MetaCourse>> {
     val context = Context.enter()
     val scope: Scriptable = context.initStandardObjects()
-    context.evaluateString(scope, Files.TaskActivity_New, "TaskActivity", 1, null)
+    context.optimizationLevel = -1
+    val activity = ResourceLoader.loadJavaScriptFile("activity.js")
+    val underscore = ResourceLoader.loadJavaScriptFile("underscore.js")
+    context.evaluateString(scope, activity, "TaskActivity", 1, null)
 
-    context.evaluateString(scope, Files.UnderScore, "underscore", 1, null)
+    context.evaluateString(scope, underscore, "underscore", 1, null)
 
     context.evaluateString(scope, scriptString, "script", 1, null)
 
@@ -159,3 +164,4 @@ fun List<Course>.filterByWeekAndPeriod(week: Int = -1, period: Int = -1):List<Co
         }
     }
 }
+
