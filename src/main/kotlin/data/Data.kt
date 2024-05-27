@@ -1,7 +1,8 @@
-package org.jetos.data
+package org.jetos.neu.eams.data
 
 /**
  * 课程表数据类
+```json
 {
     "courseId": "103055(A070835)",
     "courseName": "工程伦理学(A070835)",
@@ -14,7 +15,9 @@ package org.jetos.data
     "teacherId": "9863,10341,11272,13741",
     "teacherName": "任涛,李昕,刘益先,曾荣飞",
     "vaildWeeks": "00100000000000000000000000000000000000000000000000000" //注意这里有笔误
-*/
+}
+```
+ */
 data class MetaCourse(
     val courseId: String,//"103055(A070835)"
     val courseName: String,//"工程伦理学(A070835)"
@@ -29,7 +32,10 @@ data class MetaCourse(
     //validWeeks, misspelled
     val vaildWeeks: String,//"00100000000000000000000000000000000000000000000000000"
 
-)
+){
+    val validWeeks: String
+        get() = vaildWeeks
+}
 
 data class Student(
     val studentId: Int,//78649

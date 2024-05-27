@@ -1,8 +1,8 @@
-package org.jetos.util
+package org.jetos.neu.eams.util
 
 import com.google.gson.Gson
-import org.jetos.ResourceLoader
-import org.jetos.data.*
+import org.jetos.neu.eams.ResourceLoader
+import org.jetos.neu.eams.data.*
 import org.jsoup.Jsoup
 import org.mozilla.javascript.Context
 import org.mozilla.javascript.Scriptable

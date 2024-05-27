@@ -6,8 +6,8 @@ plugins {
 
 }
 
-group = "org.jetos"
-version = "1.0.12"
+group = "org.jetos.neu.eams"
+version = "1.0.13"
 
 
 

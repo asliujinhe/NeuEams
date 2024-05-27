@@ -1,13 +1,13 @@
-package org.jetos
+package org.jetos.neu.eams
 
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.jetos.data.Course
-import org.jetos.data.Teacher
-import org.jetos.net.ConnectUtil
-import org.jetos.net.RequestQueueManager
+import okhttp3.Request
+import org.jetos.neu.eams.data.*
+import org.jetos.neu.eams.net.ConnectUtil
+import org.jetos.neu.eams.net.RequestQueueManager
 import java.io.File
 import java.util.function.Consumer
 import java.util.logging.Logger
@@ -234,6 +234,25 @@ object NeuEamsUtil {
         CoroutineScope(coroutineScope).launch {
             try {
                 callback.accept(ConnectUtil.getAllTeacherList(semesterId))
+            } catch (e: Exception) {
+                callback.accept(null)
+                logger.warning(e.message)
+            }
+        }
+    }
+
+    /**
+     * 创建一个自定义请求
+     * @param request 请求
+     * @param priority 优先级
+     * @param callback 代码调用回调
+     * @return 通过回调返回请求结果，有问题则返回null
+     */
+    @JvmStatic
+    fun createCustomQuery(request: Request, priority:Int = 0,  callback: Consumer<RequestQueueManager.QueueResponse?>) {
+        CoroutineScope(coroutineScope).launch {
+            try {
+                callback.accept(ConnectUtil.createCustomQuery(request, priority))
             } catch (e: Exception) {
                 callback.accept(null)
                 logger.warning(e.message)

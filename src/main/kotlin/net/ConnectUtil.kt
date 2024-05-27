@@ -1,4 +1,4 @@
-package org.jetos.net
+package org.jetos.neu.eams.net
 
 
 import com.google.gson.Gson
@@ -6,10 +6,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
 import okhttp3.*
-import org.jetos.data.Course
-import org.jetos.data.Teacher
-import org.jetos.util.StudentCourseParser
-import org.jetos.util.TeacherCourseParser
+import org.jetos.neu.eams.data.*
+import org.jetos.neu.eams.util.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.io.File
@@ -148,7 +146,7 @@ class RequestQueueManager(
 
     class RetryException(override val message: String?) : CancellationException()
 
-    data class QueueRequest(val request: Request, var retryRemains: Int = -1, val priority: Int = 0)
+    data class QueueRequest(val request: Request, var retryRemains: Int = -1, var priority: Int = 0)
 
     data class QueueItem(val request: QueueRequest, val response: CompletableDeferred<QueueResponse>) :
         Comparable<QueueItem> {
@@ -193,13 +191,13 @@ class RequestQueueManager(
                             if (remainRetry <= 0) {
                                 responseDeferred.completeExceptionally(RetryException("$request retry failed, no retry times remain"))
                             } else {
-                                logger.info("Retry required, append to end of queue, remain retry times: $remainRetry")
+                                logger.info("Retry required, priority promoted, remain retry times: $remainRetry")
                                 queueRequest.retryRemains -= 1
 
                                 launch {
                                     try {
                                         config.beforeRetry()
-                                        requestChannel.send(QueueItem(queueRequest, responseDeferred))
+                                        requestChannel.send(QueueItem(queueRequest.apply { priority ++ }, responseDeferred))
                                     } catch (e: Exception) {
                                         responseDeferred.completeExceptionally(e)
                                     }
@@ -218,12 +216,12 @@ class RequestQueueManager(
     }
 
 
-    fun enqueueRequest(request: Request, doNotRetry: Boolean = false): Deferred<QueueResponse> {
+    fun enqueueRequest(request: Request, doNotRetry: Boolean = false, priority: Int = 0): Deferred<QueueResponse> {
         val responseDeferred = CompletableDeferred<QueueResponse>()
         CoroutineScope(Dispatchers.IO).launch {
             requestChannel.send(
                 QueueItem(
-                    QueueRequest(request, if (doNotRetry) -1 else config.retryTimes),
+                    QueueRequest(request, if (doNotRetry) -1 else config.retryTimes, priority),
                     responseDeferred
                 )
             )
@@ -231,10 +229,12 @@ class RequestQueueManager(
         return responseDeferred
     }
 
-    fun enqueueRequest(url: String, doNotRetry: Boolean = false): Deferred<QueueResponse> {
+    fun enqueueRequest(url: String, doNotRetry: Boolean = false, priority: Int = 0): Deferred<QueueResponse> {
         val request = Request.Builder().url(url).build()
-        return enqueueRequest(request, doNotRetry)
+        return enqueueRequest(request, doNotRetry, priority)
     }
+
+
     fun clearCookie() {
         cookieJar.clear()
     }
@@ -516,6 +516,14 @@ object ConnectUtil {
             response.isSuccessful
         } catch (e: Exception) {
             false
+        }
+    }
+
+    internal suspend fun createCustomQuery(request: Request, priority: Int): RequestQueueManager.QueueResponse {
+        return try {
+            _requestQueueManager.enqueueRequest(request).await()
+        } catch (e: Exception) {
+            throw e
         }
     }
 }
