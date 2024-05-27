@@ -59,7 +59,11 @@ fun CourseParser.convertMeta2Course(metas: List<List<MetaCourse>>):List<Course>{
                     add(Teacher(it.toInt()))
                 }
             }
-            val room = Room(metaCourse.roomId.toInt(), metaCourse.roomName)
+            val room = try {
+                Room(metaCourse.roomId.toInt(), metaCourse.roomName)
+            } catch (e: Exception) {
+                null
+            }
             val validWeeks = metaCourse.vaildWeeks
 
             val coursePeriod = CoursePeriod(

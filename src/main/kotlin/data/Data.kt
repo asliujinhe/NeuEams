@@ -83,7 +83,7 @@ data class Course(
 
 data class CoursePeriod(
     val time: Int,//0
-    val room: Room,//(454,"信息A109(浑南校区)")
+    val room: Room?,//(454,"信息A109(浑南校区)")
     val validWeeks: String//"00100000000000000000000000000000000000000000000000000"
 ){
     fun getWeeks(): List<Int> {

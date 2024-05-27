@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "org.jetos"
-version = "1.0.11"
+version = "1.0.12"
 
 
 
