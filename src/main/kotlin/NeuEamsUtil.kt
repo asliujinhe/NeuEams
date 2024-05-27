@@ -13,7 +13,7 @@ import java.util.function.Consumer
 import java.util.logging.Logger
 
 /**
- * 一个工具类，用于获取东北大学教务系统的课程表信息
+ * 工具类，用于获取东北大学教务系统的课程表信息，兼容Java和Kotlin
  * @see ConnectUtil
  * @see RequestQueueManager
  * @see Course
